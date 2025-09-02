@@ -1,0 +1,180 @@
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      height: 100vh;
+      display: flex;
+      background-color: #000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .container {
+      display: flex;
+      width: 90%;
+      max-width: 1024px;
+      height: 90vh;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    }
+
+    .left-panel {
+      flex: 1;
+      background: #1a1a1a;
+      padding: 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .tabs {
+      display: flex;
+      margin-bottom: 32px;
+    }
+
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 14px;
+      font-weight: bold;
+      background: #000;
+      color: #fff;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: background 0.3s;
+    }
+
+    .tab.active {
+      background: #fff;
+      color: #000;
+      border-bottom: 2px solid #7e5bef;
+    }
+
+    form {
+      display: none;
+      flex-direction: column;
+    }
+
+    form.active {
+      display: flex;
+    }
+
+    label {
+      font-size: 0.9rem;
+      margin: 8px 0 4px;
+      color: #ccc;
+    }
+
+    input {
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: none;
+      background: #2a2a2a;
+      color: #fff;
+      font-size: 0.95rem;
+    }
+
+    input:focus {
+      outline: 2px solid #7e5bef;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 12px;
+      background: #7e5bef;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .message {
+      margin-top: 12px;
+      font-size: 0.9rem;
+      min-height: 1.2rem;
+      color: red;
+    }
+
+    .right-panel {
+      flex: 1;
+      background-color: #a78bfa;
+      padding: 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .right-panel h2 {
+      font-size: 2rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+      color: #1a1a1a;
+    }
+
+    .right-panel p {
+      font-size: 1rem;
+      color: #333;
+    }
+    
+    /* Style the label to match the rest */
+    label {
+      font-size: 0.9rem;
+      color: white;
+      margin-bottom: 5px;
+      display: block;
+    }
+
+    /* Custom select container */
+    .custom-select select {
+      width: 100%;
+      padding: 10px;
+      background-color: #1a1a1a; /* black panel background */
+      color: white;
+      border: 1px solid #6c63ff; /* purple border */
+      border-radius: 6px;
+      font-size: 0.95rem;
+      appearance: none; /* remove default arrow styling */
+      outline: none;
+      cursor: pointer;
+      transition: border 0.3s, box-shadow 0.3s;
+    }
+
+    /* Hover and focus styles */
+    .custom-select select:hover {
+      border-color: #8f85ff;
+    }
+
+    .custom-select select:focus {
+      box-shadow: 0 0 0 2px rgba(140, 130, 255, 0.4);
+    }
+
+    /* Custom arrow using background image (optional) */
+    .custom-select {
+      position: relative;
+    }
+
+    .custom-select::after {
+      content: "▼";
+      position: absolute;
+      top: 50%;
+      right: 12px;
+      transform: translateY(-50%);
+      color: #b3b3b3;
+      pointer-events: none;
+      font-size: 0.8rem;
+    }
+
+
+
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+        height: auto;
+      }
+      .right-panel {
+        display: none;
+      }
+    }
+
+    

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Student Profile - SkillQuest</title>
+  <link rel="stylesheet" href="student_profile.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-container">
+      <h1 class="nav-logo">SkillQuest</h1>
+      <div class="nav-links">
+        <a href="../home/home.html"><i class="fas fa-home"></i> Home</a>
+        <a href="pomodoro-timer.html"><i class="fas fa-clock"></i> Pomodoro Timer</a>
+        <button id="logout-btn" class="logout-btn">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page">
+    <!-- left: profile + numbers -->
+    <aside class="panel">
+      <div class="profile-header">
+        <div class="avatar" id="avatar">S</div>
+        <div class="profile-meta">
+          <h1 id="user-name">Student</h1>
+          <p id="user-email" class="muted">email@example.com</p>
+        </div>
+      </div>
+
+      <div class="section-title">Quick Analytics</div>
+      <div class="stats-grid" style="margin-top:10px;">
+        <div class="stat">
+          <strong id="enrolled-count">0</strong>
+          <div class="small">Enrolled Projects</div>
+        </div>
+        <div class="stat">
+          <strong id="completed-count">0</strong>
+          <div class="small">Completed Projects</div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <div class="small">Completion Rate</div>
+        <div style="font-weight:800; color:var(--accent2); font-size:1.05rem; margin-top:6px;"><span id="completion-rate">0%</span></div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <div class="small">Average days to complete</div>
+        <div style="font-weight:800; color:var(--muted); margin-top:6px;"><span id="avg-days">—</span></div>
+      </div>
+
+      <div class="section-title">XP & Streak</div>
+      <div class="stats-grid" style="margin-top:8px;">
+        <div class="stat">
+          <strong id="xp-value">0 XP</strong>
+          <div class="small">Level <span id="user-level">1</span></div>
+        </div>
+        <div class="stat">
+          <strong id="streak-value">0 🔥</strong>
+          <div class="small">Best <span id="best-streak">0</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- right: projects -->
+    <section class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-weight:800; color:var(--accent2);">Your Projects</div>
+        <div class="muted" id="projects-count">Loading…</div>
+      </div>
+
+      <div class="projects" id="projects-list">
+        <div class="muted">Loading projects…</div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" aria-hidden="true"></div>
+
+  <script>
+    /* ---------- helpers ---------- */
+    function showToast(msg, type='success', ms=3000){
+      const root = document.getElementById('toast');
+      const el = document.createElement('div');
+      el.className = 'toast-item' + (type==='error' ? ' error' : '');
+      el.textContent = msg;
+      root.appendChild(el);
+      setTimeout(()=> el.remove(), ms);
+    }
+    function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+    function formatDate(d){ if(!d) return ''; try{ return new Date(d).toISOString().slice(0,10); }catch{ return d; } }
+
+    const API = {
+      token(){ return localStorage.getItem('authToken'); },
+      async fetchProfile(){
+        const res = await fetch('http://localhost:3000/api/profile/student/me', {
+          headers: { 'Authorization': `Bearer ${this.token()}` }
+        });
+        if(!res.ok) throw new Error('Profile fetch failed');
+        return res.json();
+      },
+      async fetchDashboard(){
+        const res = await fetch('http://localhost:3000/api/user/dashboard', {
+          headers: { 'Authorization': `Bearer ${this.token()}` }
+        });
+        if(!res.ok) throw new Error('Dashboard fetch failed');
+        return res.json();
+      },
+      async fetchMyProjects(){
+        const res = await fetch('http://localhost:3000/api/projects/my-projects', {
+          headers: { 'Authorization': `Bearer ${this.token()}` }
+        });
+        if(!res.ok) throw new Error('My projects fetch failed');
+        return res.json();
+      },
+      async logActivity(action, projectId=null, moduleId=null, metadata=null){
+        const res = await fetch('http://localhost:3000/api/user/activity', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${this.token()}`, 'Content-Type':'application/json' },
+          body: JSON.stringify({ action, projectId, moduleId, metadata })
+        });
+        if(!res.ok){
+          const txt = await res.text().catch(()=>null);
+          throw new Error(txt || `Activity logging failed (${res.status})`);
+        }
+        return res.json();
+      },
+      async completeProjectOnServer(projectId){
+        const res = await fetch(`http://localhost:3000/api/projects/${projectId}/complete`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${this.token()}`, 'Content-Type': 'application/json' }
+        });
+        if(!res.ok){
+          const txt = await res.text().catch(()=>null);
+          throw new Error(txt || `Complete failed (${res.status})`);
+        }
+        return res.json();
+      },
+      async generateCertificate(projectId){
+        const res = await fetch('http://localhost:3000/api/certificates/generate', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${this.token()}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId })
+        });
+        if(!res.ok){
+          const txt = await res.text().catch(()=>null);
+          throw new Error(txt || `Certificate generation failed (${res.status})`);
+        }
+        return res.json();
+      }
+    };
+
+    async function refreshAll(){
+      const token = API.token();
+      if(!token){ window.location.href = '/registration/registration.html'; return; }
+
+      document.getElementById('refreshBtn').disabled = true;
+      document.getElementById('refreshBtn').textContent = 'Refreshing…';
+
+      try {
+        const [profileP, dashP, projectsP] = await Promise.allSettled([
+          API.fetchProfile(),
+          API.fetchDashboard(),
+          API.fetchMyProjects()
+        ]);
+
+        if(profileP.status === 'fulfilled') populateProfile(profileP.value);
+        if(dashP.status === 'fulfilled') populateDashboard(dashP.value);
+        if(projectsP.status === 'fulfilled') {
+          const payload = projectsP.value;
+          const myProjects = Array.isArray(payload) ? payload : (payload.myProjects || []);
+          populateProjects(myProjects);
+        }
+      } finally {
+        document.getElementById('refreshBtn').disabled = false;
+        document.getElementById('refreshBtn').textContent = 'Refresh';
+      }
+    }
+
+    function populateProfile(data){
+      document.getElementById('user-name').textContent = data.name || 'Student';
+      document.getElementById('user-email').textContent = data.email || '';
+      document.getElementById('avatar').textContent = (data.name || 'S').slice(0,1).toUpperCase();
+    }
+
+    function populateDashboard(d){
+      document.getElementById('enrolled-count').textContent = d.total_enrolled ?? 0;
+      document.getElementById('completed-count').textContent = (d.statusCounts && d.statusCounts.completed) ? d.statusCounts.completed : 0;
+      document.getElementById('completion-rate').textContent = (d.completionRate ?? 0) + '%';
+      document.getElementById('avg-days').textContent = d.avg_days === null ? '—' : (d.avg_days + ' days');
+      document.getElementById('xp-value').textContent = `${(d.xp && d.xp.xp_total) ?? 0} XP`;
+      document.getElementById('user-level').textContent = (d.xp && d.xp.level) ?? 1;
+      document.getElementById('streak-value').textContent = ((d.streaks && d.streaks.current_streak) ?? 0) + ' 🔥';
+      document.getElementById('best-streak').textContent = (d.streaks && d.streaks.best_streak) ?? 0;
+    }
+
+    function populateProjects(list){
+      const container = document.getElementById('projects-list');
+      const countEl = document.getElementById('projects-count');
+      if(!list || list.length === 0){
+        container.innerHTML = '<div class="muted">No projects enrolled yet.</div>';
+        countEl.textContent = '';
+        return;
+      }
+      countEl.textContent = `${list.length} project(s)`;
+      container.innerHTML = '';
+      list.forEach((p, index) => {
+        const node = document.createElement('div');
+        node.className = 'project-item';
+        const left = document.createElement('div');
+        
+        let certificateBadge = '';
+        if (p.status === 'completed' && p.certificate_id) {
+          certificateBadge = `<div class="certificate-badge"><i class="fas fa-award"></i> Certificate Earned</div>`;
+        }
+        
+        left.innerHTML = `<div class="project-title">${escapeHtml(p.name)}</div>
+                          <div class="muted">${escapeHtml(p.description || '')}</div>
+                          <div style="margin-top:6px;" class="muted">Status: <strong>${escapeHtml(p.status)}</strong>${p.completion_date ? ' • Completed '+formatDate(p.completion_date):''}</div>
+                          ${certificateBadge}`;
+        const right = document.createElement('div');
+
+        if(p.status === 'completed'){
+          if (p.certificate_id) {
+            right.innerHTML = `<div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
+                                <button class="btn" data-id="${p.id}" data-action="view">View</button>
+                                <button class="btn certificate-btn" data-cert-id="${p.certificate_id}" data-action="view-cert">View Certificate</button>
+                             </div>`;
+          } else {
+            right.innerHTML = `<div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
+                                <button class="btn" data-id="${p.id}" data-action="view">View</button>
+                                <button class="btn primary" data-id="${p.id}" data-action="generate-cert">Generate Certificate</button>
+                             </div>`;
+          }
+        } else {
+          right.innerHTML = `<div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
+                                <button class="btn" data-id="${p.id}" data-action="continue">Continue</button>
+                                <button class="btn primary" data-id="${p.id}" data-action="complete">Mark Complete</button>
+                             </div>`;
+        }
+
+        node.appendChild(left); node.appendChild(right);
+        container.appendChild(node);
+      });
+
+      container.querySelectorAll('button[data-action]').forEach(btn=>{
+        btn.addEventListener('click', async (e)=>{
+          const id = btn.dataset.id;
+          const certId = btn.dataset.certId;
+          const a = btn.dataset.action;
+          if(a==='view' || a==='continue'){ window.location.href = `/projects/${id}`; return; }
+          if(a==='complete'){ await handleMarkComplete(id, btn); }
+          if(a==='view-cert'){ window.location.href = `../certificate-preview.html?id=${certId}`; }
+          if(a==='generate-cert'){ await handleGenerateCertificate(id, btn); }
+        });
+      });
+    }
+
+    async function handleMarkComplete(projectId, btn){
+      if (btn.dataset.processing === '1') return;
+      btn.dataset.processing = '1';
+      btn.disabled = true;
+      const originalText = btn.textContent;
+      btn.textContent = 'Processing…';
+
+      try {
+        const updated = await API.completeProjectOnServer(projectId);
+        await API.logActivity('completed_project', Number(projectId), null, { source: 'student_profile' });
+
+        const item = btn.closest('.project-item');
+        if (item) {
+          const mutedEls = item.querySelectorAll('.muted');
+          mutedEls.forEach(el => {
+            if (el.textContent && el.textContent.toLowerCase().includes('status:')) {
+              el.innerHTML = `Status: <strong>completed</strong> • Completed on ${formatDate(updated.completion_date || new Date())}`;
+            }
+          });
+
+          const newActions = document.createElement('div');
+          newActions.innerHTML = `<button class="btn" data-id="${projectId}" data-action="view">View</button>`;
+          const children = Array.from(item.children);
+          const lastChild = children[children.length - 1];
+          if (lastChild) lastChild.replaceWith(newActions);
+
+          const viewBtn = newActions.querySelector('button[data-action="view"]');
+          if (viewBtn) viewBtn.addEventListener('click', () => {
+            window.location.href = `/projects/${projectId}`;
+          });
+        }
+
+        const dash = await API.fetchDashboard();
+        populateDashboard(dash);
+
+        showToast('Project marked complete!', 'success');
+      } catch (err) {
+        console.error('handleMarkComplete error:', err);
+        showToast(err.message || 'Failed to mark project complete', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
+      } finally {
+        delete btn.dataset.processing;
+      }
+    }
+
+    async function handleGenerateCertificate(projectId, btn){
+      if (btn.dataset.processing === '1') return;
+      btn.dataset.processing = '1';
+      btn.disabled = true;
+      const originalText = btn.textContent;
+      btn.textContent = 'Processing…';
+
+      try {
+        const certificate = await API.generateCertificate(projectId);
+        await API.logActivity('generated_certificate', Number(projectId), null, { source: 'student_profile' });
+
+        const item = btn.closest('.project-item');
+        if (item) {
+          const mutedEls = item.querySelectorAll('.muted');
+          mutedEls.forEach(el => {
+            if (el.textContent && el.textContent.toLowerCase().includes('status:')) {
+              el.innerHTML = `Status: <strong>completed</strong> • Certificate Generated`;
+            }
+          });
+
+          const newActions = document.createElement('div');
+          newActions.innerHTML = `<button class="btn" data-id="${projectId}" data-action="view">View</button>`;
+          const children = Array.from(item.children);
+          const lastChild = children[children.length - 1];
+          if (lastChild) lastChild.replaceWith(newActions);
+
+          const viewBtn = newActions.querySelector('button[data-action="view"]');
+          if (viewBtn) viewBtn.addEventListener('click', () => {
+            window.location.href = `/projects/${projectId}`;
+          });
+        }
+
+        const dash = await API.fetchDashboard();
+        populateDashboard(dash);
+
+        showToast('Certificate generated!', 'success');
+      } catch (err) {
+        console.error('handleGenerateCertificate error:', err);
+        showToast(err.message || 'Failed to generate certificate', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
+      } finally {
+        delete btn.dataset.processing;
+      }
+    }
+
+    // Event listeners
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      localStorage.removeItem('authToken');
+      window.location.href = '../registration/registration.html';
+    });
+    document.getElementById('refreshBtn').addEventListener('click', refreshAll);
+
+    (function init(){
+      const token = API.token();
+      if(!token){ window.location.href = '/registration/registration.html'; return; }
+      refreshAll();
+    })();
+  </script>
+</body>
+</html>

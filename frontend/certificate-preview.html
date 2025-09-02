@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificate Preview - SkillQuest</title>
+    <link rel="stylesheet" href="certificate-preview.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Playfair+Display:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="nav-logo">SkillQuest</h1>
+            <div class="nav-links">
+                <a href="home/home.html"><i class="fas fa-home"></i> Home</a>
+                <a href="Student-Profile/student_profile.html"><i class="fas fa-user"></i> Profile</a>
+                <button id="logout-btn" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="certificate-container">
+        <div class="certificate-actions">
+            <button class="btn-secondary" onclick="window.history.back()">
+                <i class="fas fa-arrow-left"></i> Back
+            </button>
+            <button class="btn-primary" onclick="downloadCertificate()">
+                <i class="fas fa-download"></i> Download PDF
+            </button>
+        </div>
+
+        <div class="certificate-wrapper">
+            <div class="certificate" id="certificate">
+                <div class="certificate-header">
+                    <div class="logo">
+                        <i class="fas fa-graduation-cap"></i>
+                        <span>SkillQuest</span>
+                    </div>
+                    <div class="certificate-title">
+                        <h1>Certificate of Completion</h1>
+                        <p>This is to certify that</p>
+                    </div>
+                </div>
+
+                <div class="certificate-body">
+                    <div class="student-name" id="student-name">Student Name</div>
+                    <div class="completion-text">
+                        has successfully completed the project
+                    </div>
+                    <div class="project-name" id="project-name">Project Name</div>
+                    <div class="project-description" id="project-description">
+                        Project description will appear here
+                    </div>
+                    
+                    <div class="certificate-details">
+                        <div class="detail-item">
+                            <span class="label">Difficulty Level:</span>
+                            <span class="value" id="difficulty">Beginner</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">Completion Date:</span>
+                            <span class="value" id="completion-date">January 1, 2024</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">Certificate ID:</span>
+                            <span class="value" id="certificate-id">CERT-123456</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="certificate-footer">
+                    <div class="signature-section">
+                        <div class="signature-line"></div>
+                        <p>SkillQuest Team</p>
+                    </div>
+                    <div class="issued-date">
+                        <span>Issued on: </span>
+                        <span id="issued-date">January 1, 2024</span>
+                    </div>
+                </div>
+
+                <div class="certificate-border">
+                    <div class="border-pattern"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        class CertificatePreview {
+            constructor() {
+                this.certificateId = null;
+                this.certificateData = null;
+                this.init();
+            }
+
+            async init() {
+                const token = localStorage.getItem('authToken');
+                if (!token) {
+                    window.location.href = 'registration/registration.html';
+                    return;
+                }
+
+                // Get certificate ID from URL parameters
+                const urlParams = new URLSearchParams(window.location.search);
+                this.certificateId = urlParams.get('id');
+
+                if (!this.certificateId) {
+                    alert('Certificate ID not found');
+                    window.history.back();
+                    return;
+                }
+
+                this.setupEventListeners();
+                await this.loadCertificate();
+            }
+
+            setupEventListeners() {
+                const logoutBtn = document.getElementById('logout-btn');
+                if (logoutBtn) {
+                    logoutBtn.addEventListener('click', () => {
+                        localStorage.removeItem('authToken');
+                        window.location.href = 'registration/registration.html';
+                    });
+                }
+            }
+
+            async loadCertificate() {
+                try {
+                    const token = localStorage.getItem('authToken');
+                    const response = await fetch(`http://localhost:3000/api/certificates/${this.certificateId}/preview`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.certificateData = data.preview;
+                        this.displayCertificate();
+                    } else {
+                        const errorData = await response.json();
+                        alert(errorData.message || 'Failed to load certificate');
+                        window.history.back();
+                    }
+                } catch (error) {
+                    console.error('Error loading certificate:', error);
+                    alert('Failed to load certificate');
+                    window.history.back();
+                }
+            }
+
+            displayCertificate() {
+                if (!this.certificateData) return;
+
+                document.getElementById('student-name').textContent = this.certificateData.studentName;
+                document.getElementById('project-name').textContent = this.certificateData.projectName;
+                document.getElementById('project-description').textContent = this.certificateData.projectDescription;
+                document.getElementById('difficulty').textContent = this.certificateData.difficulty.charAt(0).toUpperCase() + this.certificateData.difficulty.slice(1);
+                document.getElementById('completion-date').textContent = this.certificateData.formattedCompletionDate;
+                document.getElementById('issued-date').textContent = this.certificateData.formattedIssuedDate;
+                document.getElementById('certificate-id').textContent = this.certificateData.certificateId;
+            }
+        }
+
+        // Initialize certificate preview
+        const certificatePreview = new CertificatePreview();
+
+        // Download certificate function
+        function downloadCertificate() {
+            // For now, just show a message that PDF download would be implemented
+            alert('PDF download functionality would be implemented here. This would generate a PDF version of the certificate.');
+            
+            // In a real implementation, you would:
+            // 1. Call a backend endpoint to generate PDF
+            // 2. Download the generated PDF file
+            // 3. Or use a library like jsPDF to generate PDF on the frontend
+        }
+    </script>
+</body>
+</html>

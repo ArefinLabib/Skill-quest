@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Skills Roadmap - SkillQuest</title>
+  <link rel="stylesheet" href="roadmap.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="logo">SkillQuest</div>
+    <div class="nav-links">
+      <a href="../home/home.html">Home</a>
+      <a href="../Student-Profile/student_profile.html">Profile</a>
+      <button id="logoutBtn">Logout</button>
+    </div>
+  </nav>
+
+  <main class="container">
+    <!-- Project Header -->
+    <section class="project-header" id="project-header">
+      <div class="header-content">
+        <h1 id="project-title">Loading...</h1>
+        <p id="project-description" class="project-description"></p>
+        <div class="project-meta" id="project-meta">
+          <span class="difficulty-badge" id="difficulty-badge">Beginner</span>
+        </div>
+      </div>
+      <div class="progress-overview" id="progress-overview">
+        <div class="progress-circle">
+          <svg viewBox="0 0 100 100" class="progress-ring">
+            <circle cx="50" cy="50" r="45" class="progress-ring-bg"/>
+            <circle cx="50" cy="50" r="45" class="progress-ring-fill" id="progress-circle"/>
+          </svg>
+          <div class="progress-text">
+            <span class="progress-percentage" id="progress-percentage">0%</span>
+            <span class="progress-label">Complete</span>
+          </div>
+        </div>
+        <div class="progress-stats">
+          <div class="stat">
+            <strong id="completed-modules">0</strong>
+            <span>of <span id="total-modules">0</span> modules</span>
+          </div>
+          <div class="stat">
+            <strong id="estimated-hours">0</strong>
+            <span>hours estimated</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Roadmap Timeline -->
+    <section class="roadmap-timeline" id="roadmap-timeline">
+      <h2>Learning Roadmap</h2>
+      <div class="timeline" id="modules-timeline">
+        <div class="loading-message">Loading roadmap modules...</div>
+      </div>
+    </section>
+
+    <!-- Module Details Modal -->
+    <div id="module-modal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modal-module-title">Module Details</h3>
+          <button class="modal-close" id="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="module-info" id="modal-module-info">
+            <!-- Module details will be populated here -->
+          </div>
+          <div class="module-resources" id="modal-module-resources">
+            <!-- Resources will be populated here -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <div class="module-progress" id="modal-module-progress">
+            <!-- Progress controls will be populated here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resource Details Modal -->
+    <div id="resource-modal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="resource-modal-title">Resource Details</h3>
+          <button class="modal-close" id="resource-modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="resource-info" id="resource-modal-info">
+            <!-- Resource details will be populated here -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <div class="resource-actions" id="resource-modal-actions">
+            <!-- Resource actions will be populated here -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast" aria-hidden="true"></div>
+
+  <script>
+    // Get project ID from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const projectId = urlParams.get('projectId') || window.location.pathname.split('/').pop();
+    
+    if (!projectId || projectId === 'roadmap.html') {
+      // Redirect to home if no project ID
+      window.location.href = '../home/home.html';
+    }
+
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      window.location.href = '../registration/registration.html';
+    }
+
+    // Global state
+    let currentRoadmap = null;
+    let currentModuleId = null;
+    let currentResourceId = null;
+
+    // DOM Elements
+    const projectTitle = document.getElementById('project-title');
+    const projectDescription = document.getElementById('project-description');
+    const difficultyBadge = document.getElementById('difficulty-badge');
+    const progressPercentage = document.getElementById('progress-percentage');
+    const progressCircle = document.getElementById('progress-circle');
+    const completedModules = document.getElementById('completed-modules');
+    const totalModules = document.getElementById('total-modules');
+    const estimatedHours = document.getElementById('estimated-hours');
+    const modulesTimeline = document.getElementById('modules-timeline');
+    const moduleModal = document.getElementById('module-modal');
+    const resourceModal = document.getElementById('resource-modal');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    // Utility Functions
+    function showToast(message, type = 'success', ms = 3500) {
+      const toastRoot = document.getElementById('toast');
+      const el = document.createElement('div');
+      el.className = `toast-item ${type}`;
+      el.textContent = message;
+      toastRoot.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+      setTimeout(() => {
+        el.classList.remove('show');
+        setTimeout(() => el.remove(), 220);
+      }, ms);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>\"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+
+    function formatDuration(minutes) {
+      if (!minutes) return '0 min';
+      if (minutes < 60) return `${minutes} min`;
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+    }
+
+    function updateProgressCircle(percentage) {
+      const circle = document.getElementById('progress-circle');
+      const circumference = 2 * Math.PI * 45; // r = 45
+      const offset = circumference - (percentage / 100) * circumference;
+      circle.style.strokeDasharray = circumference;
+      circle.style.strokeDashoffset = offset;
+    }
+
+    // API Functions
+    async function fetchRoadmap() {
+      try {
+        const response = await fetch(`http://localhost:3000/api/projects/${projectId}/roadmap`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch roadmap');
+        }
+
+        const data = await response.json();
+        currentRoadmap = data;
+        renderRoadmap(data);
+      } catch (error) {
+        console.error('Error fetching roadmap:', error);
+        showToast('Failed to load roadmap', 'error');
+        modulesTimeline.innerHTML = '<div class="error-message">Failed to load roadmap. Please try refreshing.</div>';
+      }
+    }
+
+    async function fetchModuleResources(moduleId) {
+      try {
+        const response = await fetch(`http://localhost:3000/api/modules/${moduleId}/resources`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch module resources');
+        }
+
+        return await response.json();
+      } catch (error) {
+        console.error('Error fetching module resources:', error);
+        return { resources: {}, total_count: 0 };
+      }
+    }
+
+    async function updateModuleProgress(moduleId, updates) {
+      try {
+        const response = await fetch(`http://localhost:3000/api/modules/${moduleId}/progress`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(updates)
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update module progress');
+        }
+
+        showToast('Progress updated successfully');
+        // Refresh the roadmap to get updated progress
+        await fetchRoadmap();
+      } catch (error) {
+        console.error('Error updating module progress:', error);
+        showToast('Failed to update progress', 'error');
+      }
+    }
+
+    async function recordResourceInteraction(resourceId, interactionType, additionalData = {}) {
+      try {
+        const payload = {
+          interaction_type: interactionType,
+          ...additionalData
+        };
+
+        const response = await fetch(`http://localhost:3000/api/resources/${resourceId}/interact`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to record interaction');
+        }
+
+        if (interactionType === 'completed') {
+          showToast('Resource marked as completed!');
+        }
+      } catch (error) {
+        console.error('Error recording resource interaction:', error);
+      }
+    }
+
+    // Render Functions
+    function renderRoadmap(roadmap) {
+      // Update project header
+      projectTitle.textContent = roadmap.project.name;
+      projectDescription.textContent = roadmap.project.description || '';
+      difficultyBadge.textContent = roadmap.project.difficulty;
+      difficultyBadge.className = `difficulty-badge difficulty-${roadmap.project.difficulty.toLowerCase()}`;
+
+      // Update progress overview
+      const progress = roadmap.stats.overall_progress;
+      progressPercentage.textContent = `${progress}%`;
+      updateProgressCircle(progress);
+      completedModules.textContent = roadmap.stats.completed_modules;
+      totalModules.textContent = roadmap.stats.total_modules;
+      estimatedHours.textContent = roadmap.stats.estimated_total_hours;
+
+      // Render modules timeline
+      renderModulesTimeline(roadmap.modules);
+    }
+
+    function renderModulesTimeline(modules) {
+      modulesTimeline.innerHTML = '';
+
+      if (modules.length === 0) {
+        modulesTimeline.innerHTML = '<div class="empty-message">No modules available for this project.</div>';
+        return;
+      }
+
+      modules.forEach((module, index) => {
+        const moduleElement = createModuleElement(module, index === modules.length - 1);
+        modulesTimeline.appendChild(moduleElement);
+      });
+    }
+
+    function createModuleElement(module, isLast) {
+      const element = document.createElement('div');
+      element.className = `timeline-item module-item ${getModuleStatusClass(module)}`;
+      
+      const statusIcon = getModuleStatusIcon(module);
+      const progressBar = module.progress_percentage > 0 ? 
+        `<div class="module-progress-bar">
+          <div class="progress-fill" style="width: ${module.progress_percentage}%"></div>
+        </div>` : '';
+
+      element.innerHTML = `
+        <div class="timeline-marker">
+          <div class="marker-icon">${statusIcon}</div>
+          ${!isLast ? '<div class="timeline-line"></div>' : ''}
+        </div>
+        <div class="timeline-content">
+          <div class="module-header">
+            <h3 class="module-title">${escapeHtml(module.title)}</h3>
+            <div class="module-meta">
+              <span class="module-difficulty">${module.difficulty}</span>
+              <span class="module-duration">${formatDuration(module.estimated_hours * 60)}</span>
+              ${module.is_optional ? '<span class="optional-badge">Optional</span>' : ''}
+            </div>
+          </div>
+          <p class="module-description">${escapeHtml(module.description || '')}</p>
+          ${progressBar}
+          <div class="module-actions">
+            <button class="btn btn-primary open-module-btn" data-module-id="${module.id}" 
+                    ${!module.is_unlocked ? 'disabled' : ''}>
+              ${module.status === 'not_started' ? 'Start Module' : 'View Module'}
+            </button>
+            ${!module.is_unlocked ? '<span class="locked-message">Complete prerequisites first</span>' : ''}
+          </div>
+        </div>
+      `;
+
+      // Add click handler for module button
+      const moduleBtn = element.querySelector('.open-module-btn');
+      if (moduleBtn && !moduleBtn.disabled) {
+        moduleBtn.addEventListener('click', () => openModuleModal(module.id));
+      }
+
+      return element;
+    }
+
+    function getModuleStatusClass(module) {
+      if (!module.is_unlocked) return 'locked';
+      return `status-${module.status.replace('_', '-')}`;
+    }
+
+    function getModuleStatusIcon(module) {
+      if (!module.is_unlocked) return '🔒';
+      switch (module.status) {
+        case 'completed': return '✅';
+        case 'in_progress': return '🔄';
+        case 'skipped': return '⏭️';
+        default: return '⭕';
+      }
+    }
+
+    // Modal Functions
+    async function openModuleModal(moduleId) {
+      currentModuleId = moduleId;
+      const module = currentRoadmap.modules.find(m => m.id === moduleId);
+      
+      if (!module) return;
+
+      // Show modal with loading state
+      document.getElementById('modal-module-title').textContent = module.title;
+      moduleModal.style.display = 'flex';
+      
+      // Populate module info
+      renderModuleInfo(module);
+      
+      // Fetch and render resources
+      const resourcesData = await fetchModuleResources(moduleId);
+      renderModuleResources(resourcesData.resources);
+      
+      // Render progress controls
+      renderModuleProgressControls(module);
+    }
+
+    function renderModuleInfo(module) {
+      const moduleInfo = document.getElementById('modal-module-info');
+      
+      const skillsHtml = module.skills.map(skill => `
+        <div class="skill-item ${skill.is_primary ? 'primary' : 'secondary'}">
+          <span class="skill-name">${escapeHtml(skill.name)}</span>
+          <div class="skill-levels">
+            <span class="current-level">Current: ${skill.user_current_level}</span>
+            <span class="target-level">Target: ${skill.target_level}</span>
+          </div>
+        </div>
+      `).join('');
+
+      const prerequisitesHtml = module.prerequisites.length > 0 ? `
+        <div class="prerequisites">
+          <h4>Prerequisites</h4>
+          ${module.prerequisites.map(prereq => `
+            <div class="prerequisite-item ${prereq.is_strict ? 'strict' : 'optional'}">
+              ${escapeHtml(prereq.title)} ${prereq.is_strict ? '(Required)' : '(Recommended)'}
+            </div>
+          `).join('')}
+        </div>
+      ` : '';
+
+      moduleInfo.innerHTML = `
+        <div class="module-details">
+          <p class="module-description">${escapeHtml(module.description || '')}</p>
+          <div class="module-meta-grid">
+            <div class="meta-item">
+              <strong>Difficulty:</strong> ${module.difficulty}
+            </div>
+            <div class="meta-item">
+              <strong>Estimated Time:</strong> ${formatDuration(module.estimated_hours * 60)}
+            </div>
+            <div class="meta-item">
+              <strong>Status:</strong> ${module.status.replace('_', ' ').toUpperCase()}
+            </div>
+            <div class="meta-item">
+              <strong>Progress:</strong> ${module.progress_percentage}%
+            </div>
+          </div>
+          ${prerequisitesHtml}
+          <div class="skills-section">
+            <h4>Skills You'll Learn</h4>
+            <div class="skills-grid">
+              ${skillsHtml}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderModuleResources(resources) {
+      const resourcesContainer = document.getElementById('modal-module-resources');
+      
+      const categories = ['prerequisite', 'core', 'practice', 'assessment', 'supplementary'];
+      const categoryTitles = {
+        prerequisite: 'Prerequisites',
+        core: 'Core Learning',
+        practice: 'Practice & Exercises',
+        assessment: 'Assessments',
+        supplementary: 'Additional Resources'
+      };
+
+      let html = '<div class="resources-section"><h4>Learning Resources</h4>';
+
+      categories.forEach(category => {
+        const categoryResources = resources[category] || [];
+        if (categoryResources.length === 0) return;
+
+        html += `
+          <div class="resource-category">
+            <h5 class="category-title">${categoryTitles[category]}</h5>
+            <div class="resource-list">
+        `;
+
+        categoryResources.forEach(resource => {
+          const isCompleted = resource.user_interaction === 'completed';
+          const ratingStars = '★'.repeat(Math.floor(resource.rating)) + '☆'.repeat(5 - Math.floor(resource.rating));
+
+          html += `
+            <div class="resource-item ${isCompleted ? 'completed' : ''}" data-resource-id="${resource.id}">
+              <div class="resource-header">
+                <div class="resource-type-icon">${getResourceTypeIcon(resource.resource_type)}</div>
+                <h6 class="resource-title">${escapeHtml(resource.title)}</h6>
+                <div class="resource-meta">
+                  <span class="resource-duration">${formatDuration(resource.estimated_duration)}</span>
+                  ${resource.is_free ? '<span class="free-badge">Free</span>' : '<span class="paid-badge">Paid</span>'}
+                </div>
+              </div>
+              <p class="resource-description">${escapeHtml(resource.description || '')}</p>
+              <div class="resource-footer">
+                <div class="resource-rating">
+                  <span class="rating-stars">${ratingStars}</span>
+                  <span class="rating-count">(${resource.vote_count})</span>
+                </div>
+                <div class="resource-actions">
+                  <button class="btn btn-sm view-resource-btn" data-resource-id="${resource.id}">
+                    ${resource.url ? 'View Resource' : 'Details'}
+                  </button>
+                  ${!isCompleted ? 
+                    `<button class="btn btn-sm btn-success mark-complete-btn" data-resource-id="${resource.id}">Complete</button>` :
+                    `<span class="completed-badge">✓ Completed</span>`
+                  }
+                </div>
+              </div>
+            </div>
+          `;
+        });
+
+        html += '</div></div>';
+      });
+
+      html += '</div>';
+      resourcesContainer.innerHTML = html;
+
+      // Add event listeners for resource buttons
+      resourcesContainer.querySelectorAll('.view-resource-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const resourceId = e.target.dataset.resourceId;
+          openResource(resourceId);
+        });
+      });
+
+      resourcesContainer.querySelectorAll('.mark-complete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const resourceId = e.target.dataset.resourceId;
+          markResourceComplete(resourceId);
+        });
+      });
+    }
+
+    function renderModuleProgressControls(module) {
+      const progressContainer = document.getElementById('modal-module-progress');
+      
+      const statusOptions = ['not_started', 'in_progress', 'completed', 'skipped'];
+      const statusLabels = {
+        not_started: 'Not Started',
+        in_progress: 'In Progress',
+        completed: 'Completed',
+        skipped: 'Skipped'
+      };
+
+      let html = `
+        <div class="progress-controls">
+          <div class="progress-actions">
+            <label for="module-status">Status:</label>
+            <select id="module-status" class="status-select">
+              ${statusOptions.map(status => `
+                <option value="${status}" ${module.status === status ? 'selected' : ''}>
+                  ${statusLabels[status]}
+                </option>
+              `).join('')}
+            </select>
+            
+            <label for="module-progress">Progress:</label>
+            <input type="range" id="module-progress" min="0" max="100" 
+                   value="${module.progress_percentage}" class="progress-slider">
+            <span class="progress-display">${module.progress_percentage}%</span>
+          </div>
+          
+          <div class="notes-section">
+            <label for="module-notes">Notes:</label>
+            <textarea id="module-notes" placeholder="Add your notes about this module..." 
+                      rows="3">${escapeHtml(module.notes || '')}</textarea>
+          </div>
+          
+          <div class="action-buttons">
+            <button class="btn btn-primary save-progress-btn">Save Progress</button>
+            <button class="btn btn-secondary close-modal-btn">Close</button>
+          </div>
+        </div>
+      `;
+
+      progressContainer.innerHTML = html;
+
+      // Add event listeners
+      const statusSelect = document.getElementById('module-status');
+      const progressSlider = document.getElementById('module-progress');
+      const progressDisplay = document.querySelector('.progress-display');
+
+      progressSlider.addEventListener('input', (e) => {
+        progressDisplay.textContent = `${e.target.value}%`;
+      });
+
+      document.querySelector('.save-progress-btn').addEventListener('click', async () => {
+        const updates = {
+          status: statusSelect.value,
+          progress_percentage: parseInt(progressSlider.value),
+          notes: document.getElementById('module-notes').value
+        };
+        
+        await updateModuleProgress(currentModuleId, updates);
+        closeModal();
+      });
+
+      document.querySelector('.close-modal-btn').addEventListener('click', closeModal);
+    }
+
+    function getResourceTypeIcon(type) {
+      const icons = {
+        video: '🎥',
+        article: '📰',
+        course: '🎓',
+        documentation: '📚',
+        exercise: '💪',
+        quiz: '❓',
+        project: '🚀'
+      };
+      return icons[type] || '📄';
+    }
+
+    async function openResource(resourceId) {
+      // Record that user viewed the resource
+      await recordResourceInteraction(resourceId, 'viewed');
+      
+      // Find the resource in current data
+      const allResources = Object.values(currentRoadmap?.modules?.find(m => m.id === currentModuleId)?.resources || {}).flat();
+      const resource = allResources?.find(r => r.id == resourceId);
+      
+      if (resource?.url) {
+        window.open(resource.url, '_blank');
+      } else {
+        showToast('Resource URL not available', 'error');
+      }
+    }
+
+    async function markResourceComplete(resourceId) {
+      await recordResourceInteraction(resourceId, 'completed');
+      
+      // Refresh the module resources display
+      const resourcesData = await fetchModuleResources(currentModuleId);
+      renderModuleResources(resourcesData.resources);
+    }
+
+    function closeModal() {
+      moduleModal.style.display = 'none';
+      resourceModal.style.display = 'none';
+      currentModuleId = null;
+      currentResourceId = null;
+    }
+
+    // Event Listeners
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => {
+        localStorage.removeItem('authToken');
+        window.location.href = '../registration/registration.html';
+      });
+    }
+
+    // Modal close buttons
+    document.getElementById('modal-close').addEventListener('click', closeModal);
+    document.getElementById('resource-modal-close').addEventListener('click', closeModal);
+
+    // Close modal when clicking outside
+    [moduleModal, resourceModal].forEach(modal => {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+      });
+    });
+
+    // Initialize the page
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchRoadmap();
+    });
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Select Your Goals & Skills</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="navbar">
+    <div class="brand">SkillQuest</div>
+  </div>
+  <div class="wizard-container">
+    <!-- Step 1: Goals -->
+    <div id="step-goals" class="step active">
+      <div class="title">Choose Your Learning Goals</div>
+      <div id="goals-list" class="choices"></div>
+      <div class="actions">
+        <button id="next-to-skills" class="btn" disabled>Next</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Skills -->
+    <div id="step-skills" class="step">
+      <div class="title">Choose Relevant Skills & Proficiency</div>
+      <div id="skills-list"></div>
+      <div class="actions">
+        <button id="back-to-goals" class="btn">Back</button>
+        <button id="submit-wizard" class="btn" disabled>Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const token = localStorage.getItem('authToken');
+    console.log('Auth Token:', token);
+
+    async function loadGoals() {
+      try {
+        const response = await fetch('http://localhost:3000/api/goals');
+        if (!response.ok) throw new Error('Network response was not ok');
+        const data = await response.json();
+        return data.goals || [];
+      } catch (err) {
+        console.error('Failed to load goals:', err);
+        return [];
+      }
+    }
+
+    let goals = [];
+    let skillMap = {};
+    const selectedGoals = new Set();
+    const selectedSkills = {};
+
+    const goalsListEl = document.getElementById('goals-list');
+    const nextBtn = document.getElementById('next-to-skills');
+    const skillsListEl = document.getElementById('skills-list');
+    const backBtn = document.getElementById('back-to-goals');
+    const submitBtn = document.getElementById('submit-wizard');
+    const stepGoalsEl = document.getElementById('step-goals');
+    const stepSkillsEl = document.getElementById('step-skills');
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      goals = await loadGoals();
+      if (goals.length === 0) {
+        console.error('No goals available');
+        alert('No goals available. Please contact support.');
+      } else {
+        renderGoals(goals);
+      }
+    });
+
+    function renderGoals(goalsArray) {
+      goalsListEl.innerHTML = '';
+      goalsArray.forEach(goal => {
+        const div = document.createElement('div');
+        div.className = 'choice';
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = goal;
+        cb.dataset.goal = goal;
+
+        const lbl = document.createElement('label');
+        lbl.textContent = goal;
+
+        cb.addEventListener('change', () => {
+          if (cb.checked) {
+            if (selectedGoals.size >= 3) {
+              alert("You can only select up to 3 goals.");
+              cb.checked = false;
+              return;
+            }
+            selectedGoals.add(goal);
+          } else {
+            selectedGoals.delete(goal);
+          }
+          nextBtn.disabled = !(selectedGoals.size >= 1 && selectedGoals.size <= 3);
+        });
+
+        div.append(cb, lbl);
+        goalsListEl.appendChild(div);
+      });
+    }
+
+    nextBtn.addEventListener('click', async () => {
+      const chosenGoals = Array.from(selectedGoals);
+      if (chosenGoals.length === 0) return;
+
+      nextBtn.textContent = 'Loading…';
+      nextBtn.disabled = true;
+
+      try {
+        const resp = await fetch('http://localhost:3000/api/skills', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ goals: chosenGoals })
+        });
+        if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
+
+        skillMap = await resp.json();
+        if (Object.keys(skillMap).length === 0) {
+          throw new Error('No skills found for selected goals');
+        }
+
+        stepGoalsEl.classList.remove('active');
+        stepSkillsEl.classList.add('active');
+        renderSkills();
+      } catch (err) {
+        console.error('Failed to load skills:', err);
+        alert(`Could not load skills: ${err.message}`);
+      } finally {
+        nextBtn.textContent = 'Next';
+        nextBtn.disabled = selectedGoals.size === 0;
+      }
+    });
+
+    backBtn.addEventListener('click', () => {
+      stepSkillsEl.classList.remove('active');
+      stepGoalsEl.classList.add('active');
+    });
+
+    function renderSkills() {
+      skillsListEl.innerHTML = '';
+      const uniqueSkills = new Set();
+
+      selectedGoals.forEach(goal => {
+        (skillMap[goal] || []).forEach(skill => uniqueSkills.add(skill));
+      });
+
+      uniqueSkills.forEach(skill => {
+        const entry = document.createElement('div');
+        entry.className = 'skill-entry';
+
+        const lbl = document.createElement('label');
+        lbl.textContent = skill;
+
+        const select = document.createElement('select');
+        ['Not Selected', 'Beginner', 'Intermediate', 'Advanced'].forEach(level => {
+          const opt = document.createElement('option');
+          opt.value = level;
+          opt.textContent = level;
+          select.appendChild(opt);
+        });
+
+        select.addEventListener('change', () => {
+          selectedSkills[skill] = select.value;
+          checkSubmitReady();
+        });
+
+        entry.append(lbl, select);
+        skillsListEl.appendChild(entry);
+      });
+    }
+
+    function checkSubmitReady() {
+      const chosenCount = Object.keys(selectedSkills)
+        .filter(s => selectedSkills[s] !== 'Not Selected').length;
+      submitBtn.disabled = chosenCount === 0;
+    }
+
+    submitBtn.addEventListener('click', async () => {
+      const payload = {
+        goals: Array.from(selectedGoals),
+        skills: Object.fromEntries(
+          Object.entries(selectedSkills).filter(([_, level]) => level !== 'Not Selected')
+        )
+      };
+      console.log('Submit payload:', payload);
+
+      try {
+        const resp = await fetch('http://localhost:3000/api/submit', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        if (!resp.ok) throw new Error(await resp.text());
+        setTimeout(() => {
+          window.location.href = '../home/home.html';
+        }, 2000);
+      } catch (err) {
+        console.error('Submit error:', err);
+        alert(`There was a problem saving your choices: ${err.message}`);
+      }
+    });
+  </script>
+</body>
+</html>

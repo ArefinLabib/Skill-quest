@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Browse Projects - SkillQuest</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: #000;
+      color: white;
+    }
+
+    nav {
+      background-color: purple;
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    nav .logo {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+    nav .nav-actions button {
+      margin-left: 10px;
+      background: #1a1a1a;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 5px;
+      color: white;
+      cursor: pointer;
+    }
+    nav .nav-actions .danger {
+      background: #ff4d4d;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 20px auto;
+      padding: 0 15px;
+    }
+
+    h1 {
+      color: #bb86fc;
+      margin-bottom: 20px;
+    }
+
+    .filters {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .filters input, .filters select {
+      padding: 10px;
+      border-radius: 5px;
+      border: none;
+      background: #1a1a1a;
+      color: white;
+      font-size: 0.9rem;
+    }
+    .filters select:focus, .filters input:focus {
+      outline: 2px solid #bb86fc;
+    }
+
+    .projects {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 15px;
+    }
+    .project-card {
+      background: #1a1a1a;
+      padding: 15px;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .project-title {
+      color: #bb86fc;
+      margin: 0 0 8px;
+    }
+    .btn {
+      background: #bb86fc;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: white;
+      font-weight: bold;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background: #9d6de8;
+    }
+    .muted {
+      color: #888;
+      font-size: 0.9rem;
+    }
+    #see-more-btn {
+      display: block;
+      margin: 20px auto;
+      background: #bb86fc;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    #see-more-btn:hover {
+      background: #9d6de8;
+    }
+    #see-more-btn.hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="logo">SkillQuest</div>
+    <div class="nav-actions">
+      <button onclick="window.location.href='student_profile.html'">My Profile</button>
+      <button class="danger" id="logout-btn">Logout</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>Browse Projects</h1>
+
+    <div class="filters">
+      <input type="text" id="search" placeholder="Search projects...">
+      <select id="goal-filter">
+        <option value="">All Goals</option>
+      </select>
+      <select id="level-filter">
+        <option value="">All Levels</option>
+        <option value="beginner">Beginner</option>
+        <option value="intermediate">Intermediate</option>
+        <option value="advanced">Advanced</option>
+      </select>
+    </div>
+
+    <div id="projects-list" class="projects">
+      <div class="muted">Loading projects...</div>
+    </div>
+    <button id="see-more-btn">See More</button>
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:3000/api";
+    let offset = 0;
+    const limit = 10; // Number of projects per batch
+
+    async function fetchProjects(offsetParam = 0) {
+      const token = localStorage.getItem("authToken");
+      try {
+        const res = await fetch(`${API_BASE}/projects?limit=${limit}&offset=${offsetParam}`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error("Failed to load projects");
+        const data = await res.json();
+        return data.projects || [];
+      } catch (err) {
+        console.error(err);
+        document.getElementById("projects-list").innerHTML = "<div class='muted'>Failed to load projects</div>";
+        return [];
+      }
+    }
+
+    async function enrollProject(id) {
+      const token = localStorage.getItem("authToken");
+      try {
+        const res = await fetch(`${API_BASE}/projects/${id}/enroll`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+        if (!res.ok) throw new Error("Failed to enroll");
+        alert("Enrolled successfully!");
+        loadProjects(); // Refresh projects
+      } catch (err) {
+        console.error(err);
+        alert("Error enrolling in project");
+      }
+    }
+
+    function renderProjects(projects) {
+      const container = document.getElementById("projects-list");
+      if (offset === 0) container.innerHTML = ""; // Clear only on initial load
+
+      if (!projects || projects.length === 0) {
+        container.innerHTML = "<div class='muted'>No more projects found</div>";
+        document.getElementById("see-more-btn").classList.add("hidden");
+        return;
+      }
+
+      projects.forEach(project => {
+        const card = document.createElement("div");
+        card.className = "project-card";
+
+        card.innerHTML = `
+          <h3 class="project-title">${project.project_name || "Untitled"}</h3>
+          <p>${project.description || "No description"}</p>
+          <small>Goal: ${project.goal_name || "—"} • Difficulty: ${project.difficulty || "—"}</small>
+          <button class="btn enroll-btn" data-id="${project.project_id}">Enroll</button>
+        `;
+
+        container.appendChild(card);
+      });
+
+      document.querySelectorAll(".enroll-btn").forEach(btn => {
+        btn.addEventListener("click", () => enrollProject(btn.dataset.id));
+      });
+
+      // Show "See More" button if there might be more projects
+      document.getElementById("see-more-btn").classList.remove("hidden");
+    }
+
+    function applyFilters(projects) {
+      const search = document.getElementById("search").value.toLowerCase();
+      const goal = document.getElementById("goal-filter").value.toLowerCase();
+      const level = document.getElementById("level-filter").value.toLowerCase();
+
+      return projects.filter(p => {
+        const matchesSearch = !search || (p.project_name && p.project_name.toLowerCase().includes(search));
+        const matchesGoal = !goal || (p.goal_name && p.goal_name.toLowerCase() === goal);
+        const matchesLevel = !level || (p.difficulty && p.difficulty.toLowerCase() === level);
+        return matchesSearch && (matchesGoal || matchesLevel);
+      });
+    }
+
+    async function loadProjects() {
+      const projects = await fetchProjects(offset);
+      const filteredProjects = applyFilters(projects);
+
+      renderProjects(filteredProjects);
+      offset += limit; // Increment offset for next batch
+    }
+
+    async function init() {
+      offset = 0; // Reset offset on init
+      await loadProjects();
+
+      // Populate goal filter dropdown dynamically
+      const allProjects = await fetchProjects(); // Fetch all to populate filters
+      const goalSet = [...new Set(allProjects.map(p => p.goal_name).filter(Boolean))];
+      const goalFilter = document.getElementById("goal-filter");
+      goalFilter.innerHTML = "<option value=''>All Goals</option>";
+      goalSet.forEach(g => {
+        const opt = document.createElement("option");
+        opt.value = g;
+        opt.textContent = g;
+        goalFilter.appendChild(opt);
+      });
+
+      function refresh() {
+        offset = 0; // Reset offset on filter change
+        loadProjects();
+      }
+
+      document.getElementById("search").addEventListener("input", refresh);
+      document.getElementById("goal-filter").addEventListener("change", refresh);
+      document.getElementById("level-filter").addEventListener("change", refresh);
+
+      document.getElementById("see-more-btn").addEventListener("click", loadProjects);
+    }
+
+    document.getElementById("logout-btn").addEventListener("click", () => {
+      localStorage.removeItem("authToken");
+      window.location.href = "../registration/registration.html";
+    });
+
+    window.addEventListener("load", init);
+  </script>
+</body>
+</html>

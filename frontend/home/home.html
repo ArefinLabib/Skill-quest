@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SkillQuest — Home</title>
+  <link rel="stylesheet" href="home.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-container">
+      <h1 class="nav-logo">SkillQuest</h1>
+      <div class="nav-links">
+        <a href="#" id="profile-btn" style="display: none;">
+          <i class="fas fa-user"></i> Profile
+        </a>
+        <a href="#" id="mentor-btn" style="display: none;">
+          <i class="fas fa-chalkboard-teacher"></i> Mentor Dashboard
+        </a>
+        <a href="../pomodoro-timer.html">
+          <i class="fas fa-clock"></i> Pomodoro Timer
+        </a>
+        <button id="logout-btn" class="logout-btn">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    <!-- Student Content -->
+    <div id="student-content" style="display: none;">
+      <!-- My Projects (first) -->
+      <section class="section" id="my-projects-section" aria-labelledby="my-projects-heading">
+        <h2 id="my-projects-heading">My Projects</h2>
+        <div id="myProjectsList" class="project-list"></div>
+      </section>
+
+      <div class="divider" aria-hidden="true"></div>
+
+      <!-- Recommended Projects (second) -->
+      <section class="section" id="recommended-section" aria-labelledby="recommended-heading">
+        <h2 id="recommended-heading">Recommended Projects</h2>
+        <div id="recommendedContainer" class="project-list" aria-live="polite"></div>
+      </section>
+    </div>
+
+    <!-- Mentor Content -->
+    <div id="mentor-content" style="display: none;">
+      <section class="section" id="mentor-welcome-section">
+        <h2>Welcome to SkillQuest, Mentor!</h2>
+        <p style="color: #bfbfbf; margin-bottom: 20px;">Create and manage learning projects to help students develop their skills.</p>
+        
+        <div class="mentor-actions">
+          <button class="mentor-action-btn" onclick="window.location.href='../mentor-dashboard.html'">
+            <i class="fas fa-chalkboard-teacher"></i>
+            <span>Go to Mentor Dashboard</span>
+          </button>
+          <button class="mentor-action-btn" onclick="window.location.href='../mentor-profile.html'">
+            <i class="fas fa-user"></i>
+            <span>View My Profile</span>
+          </button>
+        </div>
+      </section>
+
+      <div class="divider" aria-hidden="true"></div>
+
+      <section class="section" id="mentor-stats-section">
+        <h2>Quick Stats</h2>
+        <div id="mentorStats" class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number" id="total-projects">-</div>
+            <div class="stat-label">Total Projects</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="total-students">-</div>
+            <div class="stat-label">Total Students</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="total-modules">-</div>
+            <div class="stat-label">Total Modules</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div id="toast" aria-hidden="true"></div>
+
+  <script>
+  (function () {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      window.location.href = '/registration/registration.html';
+      return;
+    }
+
+    const recommendedContainer = document.getElementById('recommendedContainer');
+    const myProjectsList = document.getElementById('myProjectsList');
+    const profileBtn = document.getElementById('profileBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const mentorBtn = document.getElementById('mentorBtn');
+    const toastRoot = document.getElementById('toast');
+    const studentContent = document.getElementById('student-content');
+    const mentorContent = document.getElementById('mentor-content');
+
+    // Event listeners
+    document.getElementById('profile-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      window.location.href = '../Student-Profile/student_profile.html';
+    });
+
+    document.getElementById('mentor-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      window.location.href = '../mentor-dashboard.html';
+    });
+
+    document.getElementById('logout-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      localStorage.removeItem('authToken');
+      window.location.href = '../registration/registration.html';
+    });
+
+    function showToast(message, type = 'success', ms = 3500) {
+      const el = document.createElement('div');
+      el.className = `toast-item ${type}`;
+      el.textContent = message;
+      toastRoot.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+      setTimeout(() => {
+        el.classList.remove('show');
+        setTimeout(() => el.remove(), 220);
+      }, ms);
+    }
+
+    // load both recommendations and my projects, then render with My Projects first
+    async function loadPageData() {
+      myProjectsList.innerHTML = '<div class="empty">Loading your courses…</div>';
+      recommendedContainer.innerHTML = '<div class="empty">Loading recommendations…</div>';
+
+      try {
+        const [recResp, myResp] = await Promise.all([
+          fetch('http://localhost:3000/api/projects/recommendations', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }),
+          fetch('http://localhost:3000/api/projects/my-projects', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+        ]);
+
+        if (!recResp.ok) {
+          const errorText = await recResp.text();
+          throw new Error(`Failed to get recommendations: ${recResp.status} ${errorText}`);
+        }
+        if (!myResp.ok) {
+          const errorText = await myResp.text();
+          throw new Error(`Failed to get your projects: ${myResp.status} ${errorText}`);
+        }
+
+        const recJson = await recResp.json();
+        const myJson = await myResp.json();
+
+        const recommendations = recJson.recommendations || [];
+        const myProjects = myJson.myProjects || [];
+
+        // Build lookup of enrolled IDs
+        const enrolledIds = new Set(myProjects.map(p => Number(p.id)));
+
+        // Filter recommendations to remove already-enrolled projects
+        const filteredRecommendations = recommendations.filter(p => !enrolledIds.has(Number(p.id)));
+
+        renderMyCourses(myProjects);
+        renderRecommended(filteredRecommendations);
+      } catch (err) {
+        console.error('Error in loadPageData:', err);
+        myProjectsList.innerHTML = `<div class="empty">Unable to load data: ${escapeHtml(err.message)}</div>`;
+        recommendedContainer.innerHTML = `<div class="empty">Unable to load data: ${escapeHtml(err.message)}</div>`;
+        showToast('Unable to load data. Check console.', 'error', 5000);
+      }
+    }
+
+    function renderRecommended(list) {
+      recommendedContainer.innerHTML = '';
+      if (!list || list.length === 0) {
+        recommendedContainer.innerHTML = '<div class="empty">No recommended projects right now. Complete skills or add goals to get recommendations.</div>';
+        return;
+      }
+
+      list.forEach(project => {
+        const card = document.createElement('div');
+        card.className = 'project-card';
+        const difficulty = project.difficulty || 'N/A';
+
+        card.innerHTML = `
+          <div class="project-title">${escapeHtml(project.name)}</div>
+          <div class="project-description">${escapeHtml(truncate(project.description || '', 160))}</div>
+          <div class="project-meta">
+            <div class="meta-item"><strong>Difficulty:</strong> ${escapeHtml(difficulty)}</div>
+            <div class="meta-item"><strong>Status:</strong> <span class="status not_enrolled">Not Enrolled</span></div>
+          </div>
+          <div class="project-actions">
+            <button class="project-action enroll-btn">Enroll</button>
+          </div>
+        `;
+
+        const enrollBtn = card.querySelector('.enroll-btn');
+
+        enrollBtn.addEventListener('click', async () => {
+          enrollBtn.disabled = true;
+          enrollBtn.textContent = 'Enrolling…';
+          try {
+            const resp = await fetch(`http://localhost:3000/api/projects/${project.id}/enroll`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+              throw new Error(data.message || `Server responded ${resp.status}`);
+            }
+
+            showToast(`Enrolled in "${project.name}"`, 'success', 3000);
+            // re-fetch to get canonical server state and update both lists
+            await loadPageData();
+
+          } catch (err) {
+            console.error('Enroll error:', err);
+            showToast(`Enroll failed: ${err.message}`, 'error', 5000);
+            enrollBtn.disabled = false;
+            enrollBtn.textContent = 'Enroll';
+          }
+        });
+
+        recommendedContainer.appendChild(card);
+      });
+    }
+
+    function renderMyCourses(list) {
+      myProjectsList.innerHTML = '';
+      if (!list || list.length === 0) {
+        myProjectsList.innerHTML = '<div class="empty">You have not enrolled in any courses yet.</div>';
+        return;
+      }
+
+      list.forEach((p, index) => {
+        const card = createMyCourseCard(p);
+        myProjectsList.appendChild(card);
+      });
+    }
+
+    function createMyCourseCard(p) {
+      const card = document.createElement('div');
+      card.className = 'project-card';
+      const statusClass = (p.status === 'completed') ? 'completed' : 'in_progress';
+      const statusText = (p.status === 'completed') ? 'Completed' : 'In Progress';
+
+      let actionButtons = '';
+      let certificateBadge = '';
+
+      if (p.status === 'completed') {
+        if (p.certificate_id) {
+          // Certificate already exists - show view button
+          actionButtons = `
+            <button class="project-action certificate-btn" onclick="viewCertificate('${p.certificate_id}')">
+              <i class="fas fa-certificate"></i> View Certificate
+            </button>
+          `;
+          certificateBadge = `
+            <div class="certificate-badge">
+              <i class="fas fa-award"></i>
+              <span>Certificate Earned</span>
+            </div>
+          `;
+        } else {
+          // Project completed but no certificate - show generate button
+          actionButtons = `
+            <button class="project-action generate-cert-btn" onclick="generateCertificate(${p.id})">
+              <i class="fas fa-certificate"></i> Generate Certificate
+            </button>
+          `;
+        }
+      } else {
+        actionButtons = `
+          <button class="project-action continue-btn">Continue</button>
+          <button class="project-action roadmap-btn">View Roadmap</button>
+        `;
+      }
+
+      card.innerHTML = `
+        <div class="project-title">${escapeHtml(p.name)}</div>
+        <div class="project-description">${escapeHtml(truncate(p.description || '', 140))}</div>
+        <div class="project-meta">
+          <div class="meta-item"><strong>Difficulty:</strong> ${escapeHtml(p.difficulty || 'N/A')}</div>
+          <div class="meta-item"><strong>Status:</strong> <span class="status ${statusClass}">${statusText}</span></div>
+        </div>
+        ${certificateBadge}
+        <div class="project-actions">
+          ${actionButtons}
+        </div>
+      `;
+
+      // Add event listeners for non-certificate buttons
+      if (p.status !== 'completed') {
+        card.querySelector('.continue-btn').addEventListener('click', () => {
+          window.location.href = `/projects/${p.id}`;
+        });
+
+        card.querySelector('.roadmap-btn').addEventListener('click', () => {
+          window.location.href = `../roadmap/roadmap.html?projectId=${p.id}`;
+        });
+      }
+
+      return card;
+    }
+
+    // helpers
+    function truncate(str, max=140) {
+      if (!str) return '';
+      return str.length > max ? str.slice(0, max - 1) + '…' : str;
+    }
+    function escapeHtml(str) {
+      if (typeof str !== 'string') return str;
+      return str.replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    // Check user role and show mentor dashboard link if user is a mentor
+    async function checkUserRole() {
+      try {
+        const response = await fetch('http://localhost:3000/api/user/profile', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const user = await response.json();
+          const mentorBtn = document.getElementById('mentor-btn');
+          const profileBtn = document.getElementById('profile-btn');
+          const studentContent = document.getElementById('student-content');
+          const mentorContent = document.getElementById('mentor-content');
+
+          if (user.role === 'mentor') {
+            mentorBtn.style.display = 'inline-block';
+            profileBtn.style.display = 'none';
+            studentContent.style.display = 'none';
+            mentorContent.style.display = 'block';
+            // Load mentor specific data
+            await loadMentorStats();
+          } else {
+            mentorBtn.style.display = 'none';
+            profileBtn.style.display = 'inline-block';
+            studentContent.style.display = 'block';
+            mentorContent.style.display = 'none';
+            // Load student specific data
+            loadPageData();
+          }
+        } else {
+          console.error('Failed to get user profile');
+          showToast('Unable to get user profile. Check console.', 'error', 5000);
+        }
+      } catch (err) {
+        console.error('Error checking user role:', err);
+        showToast('Unable to check user role. Check console.', 'error', 5000);
+      }
+    }
+
+    async function loadMentorStats() {
+      try {
+        const response = await fetch('http://localhost:3000/api/mentor/stats', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const stats = await response.json();
+          document.getElementById('total-projects').textContent = stats.totalProjects || '-';
+          document.getElementById('total-students').textContent = stats.totalStudents || '-';
+          document.getElementById('total-modules').textContent = stats.totalModules || '-';
+        } else {
+          console.error('Failed to load mentor stats');
+          showToast('Unable to load mentor stats. Check console.', 'error', 5000);
+        }
+      } catch (err) {
+        console.error('Error loading mentor stats:', err);
+        showToast('Unable to load mentor stats. Check console.', 'error', 5000);
+      }
+    }
+
+    // initial load
+    checkUserRole();
+
+    // Certificate functions
+    async function generateCertificate(projectId) {
+      try {
+        const response = await fetch('http://localhost:3000/api/certificates/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ projectId })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          showToast('Certificate generated successfully!', 'success', 3000);
+          // Reload projects to show the new certificate
+          loadPageData();
+        } else {
+          const errorData = await response.json();
+          showToast(errorData.message || 'Failed to generate certificate', 'error', 5000);
+        }
+      } catch (error) {
+        console.error('Error generating certificate:', error);
+        showToast('Failed to generate certificate', 'error', 5000);
+      }
+    }
+
+    function viewCertificate(certificateId) {
+      window.location.href = `../certificate-preview.html?id=${certificateId}`;
+    }
+
+  })();
+  </script>
+</body>
+</html>

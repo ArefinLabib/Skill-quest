@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mentor Profile - SkillQuest</title>
+    <link rel="stylesheet" href="mentor-profile.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="nav-logo">SkillQuest</h1>
+            <div class="nav-links">
+                <a href="home/home.html"><i class="fas fa-home"></i> Home</a>
+                <a href="mentor-dashboard.html"><i class="fas fa-chalkboard-teacher"></i> Dashboard</a>
+                <a href="mentor-profile.html" class="active"><i class="fas fa-user"></i> Profile</a>
+                <button id="logout-btn" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="mentor-profile">
+        <div class="profile-container">
+            <!-- Profile Header -->
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    <div class="avatar-circle" id="avatar">M</div>
+                </div>
+                <div class="profile-info">
+                    <h1 id="mentor-name">Mentor Name</h1>
+                    <p id="mentor-email" class="email">email@example.com</p>
+                    <p class="role-badge">Mentor</p>
+                </div>
+            </div>
+
+            <!-- Stats Overview -->
+            <div class="stats-overview">
+                <h2>Your Impact</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-project-diagram"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="total-projects">0</div>
+                            <div class="stat-label">Projects Created</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="total-students">0</div>
+                            <div class="stat-label">Students Helped</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-puzzle-piece"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="total-modules">0</div>
+                            <div class="stat-label">Learning Modules</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-book"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="total-resources">0</div>
+                            <div class="stat-label">Resources Added</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Projects -->
+            <div class="recent-projects">
+                <div class="section-header">
+                    <h2>Recent Projects</h2>
+                    <a href="mentor-dashboard.html" class="view-all-btn">View All Projects</a>
+                </div>
+                <div id="recent-projects-list" class="projects-list">
+                    <!-- Projects will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Activity Summary -->
+            <div class="activity-summary">
+                <h2>Recent Activity</h2>
+                <div id="activity-list" class="activity-list">
+                    <!-- Activity will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        class MentorProfile {
+            constructor() {
+                this.currentUser = null;
+                this.init();
+            }
+
+            async init() {
+                const token = localStorage.getItem('authToken');
+                if (!token) {
+                    window.location.href = 'registration/registration.html';
+                    return;
+                }
+
+                // Check if user is a mentor
+                try {
+                    const response = await fetch('http://localhost:3000/api/user/profile', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (response.ok) {
+                        this.currentUser = await response.json();
+                        if (this.currentUser.role !== 'mentor') {
+                            alert('Access denied. This page is only available to mentors.');
+                            window.location.href = 'home/home.html';
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error getting user profile:', error);
+                    window.location.href = 'registration/registration.html';
+                    return;
+                }
+
+                this.setupEventListeners();
+                this.loadProfileData();
+            }
+
+            setupEventListeners() {
+                const logoutBtn = document.getElementById('logout-btn');
+                if (logoutBtn) {
+                    logoutBtn.addEventListener('click', () => {
+                        localStorage.removeItem('authToken');
+                        window.location.href = 'registration/registration.html';
+                    });
+                }
+            }
+
+            async loadProfileData() {
+                await Promise.all([
+                    this.loadProfileInfo(),
+                    this.loadStats(),
+                    this.loadRecentProjects(),
+                    this.loadActivity()
+                ]);
+            }
+
+            loadProfileInfo() {
+                if (this.currentUser) {
+                    document.getElementById('mentor-name').textContent = this.currentUser.name;
+                    document.getElementById('mentor-email').textContent = this.currentUser.email;
+                    document.getElementById('avatar').textContent = this.currentUser.name.charAt(0).toUpperCase();
+                }
+            }
+
+            async loadStats() {
+                try {
+                    const token = localStorage.getItem('authToken');
+                    const response = await fetch('http://localhost:3000/api/mentor/stats', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (response.ok) {
+                        const stats = await response.json();
+                        document.getElementById('total-projects').textContent = stats.totalProjects || 0;
+                        document.getElementById('total-students').textContent = stats.totalStudents || 0;
+                        document.getElementById('total-modules').textContent = stats.totalModules || 0;
+                        document.getElementById('total-resources').textContent = stats.totalResources || 0;
+                    }
+                } catch (error) {
+                    console.error('Error loading stats:', error);
+                }
+            }
+
+            async loadRecentProjects() {
+                try {
+                    const token = localStorage.getItem('authToken');
+                    const response = await fetch('http://localhost:3000/api/mentor/projects', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (response.ok) {
+                        const projects = await response.json();
+                        this.displayRecentProjects(projects.slice(0, 3)); // Show only 3 recent projects
+                    }
+                } catch (error) {
+                    console.error('Error loading recent projects:', error);
+                }
+            }
+
+            displayRecentProjects(projects) {
+                const container = document.getElementById('recent-projects-list');
+                
+                if (projects.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-project-diagram"></i>
+                            <h3>No Projects Yet</h3>
+                            <p>Create your first project to start helping students learn!</p>
+                            <a href="mentor-dashboard.html" class="btn-primary">Create Project</a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = projects.map(project => `
+                    <div class="project-item">
+                        <div class="project-info">
+                            <h3>${this.escapeHtml(project.name)}</h3>
+                            <p>${this.escapeHtml(project.description)}</p>
+                            <div class="project-meta">
+                                <span class="difficulty-badge ${project.difficulty.toLowerCase()}">
+                                    ${project.difficulty}
+                                </span>
+                                <span class="enrollment-count">
+                                    <i class="fas fa-users"></i> ${project.enrolled_count || 0} students
+                                </span>
+                            </div>
+                        </div>
+                        <div class="project-actions">
+                            <button class="btn-secondary" onclick="window.location.href='mentor-dashboard.html'">
+                                <i class="fas fa-edit"></i> Manage
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            async loadActivity() {
+                try {
+                    const token = localStorage.getItem('authToken');
+                    const response = await fetch('http://localhost:3000/api/mentor/activity', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (response.ok) {
+                        const activity = await response.json();
+                        this.displayActivity(activity);
+                    } else {
+                        // If activity endpoint doesn't exist, show placeholder
+                        this.displayActivity([]);
+                    }
+                } catch (error) {
+                    console.error('Error loading activity:', error);
+                    this.displayActivity([]);
+                }
+            }
+
+            displayActivity(activity) {
+                const container = document.getElementById('activity-list');
+                
+                if (activity.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-chart-line"></i>
+                            <h3>No Recent Activity</h3>
+                            <p>Your activity will appear here as you create and manage projects.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = activity.map(item => `
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <i class="fas fa-${this.getActivityIcon(item.type)}"></i>
+                        </div>
+                        <div class="activity-content">
+                            <p>${this.escapeHtml(item.description)}</p>
+                            <span class="activity-time">${this.formatTime(item.created_at)}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            getActivityIcon(type) {
+                const icons = {
+                    'project_created': 'plus-circle',
+                    'project_updated': 'edit',
+                    'module_added': 'puzzle-piece',
+                    'resource_added': 'book',
+                    'student_enrolled': 'user-plus'
+                };
+                return icons[type] || 'circle';
+            }
+
+            formatTime(timestamp) {
+                const date = new Date(timestamp);
+                const now = new Date();
+                const diff = now - date;
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                
+                if (days === 0) return 'Today';
+                if (days === 1) return 'Yesterday';
+                if (days < 7) return `${days} days ago`;
+                return date.toLocaleDateString();
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+        }
+
+        // Initialize the mentor profile
+        const mentorProfile = new MentorProfile();
+    </script>
+</body>
+</html>

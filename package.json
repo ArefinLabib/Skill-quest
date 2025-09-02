@@ -1,0 +1,33 @@
+{
+  "name": "skill-quest",
+  "version": "1.0.0",
+  "description": "A comprehensive project-based learning platform that connects students with mentors to learn real-world skills through hands-on projects.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "nodemon main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArefinLabib/skill-quest.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/ArefinLabib/skill-quest/issues"
+  },
+  "homepage": "https://github.com/ArefinLabib/skill-quest#readme",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.14.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}

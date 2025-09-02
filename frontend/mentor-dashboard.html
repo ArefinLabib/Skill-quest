@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mentor Dashboard - SkillQuest</title>
+    <link rel="stylesheet" href="mentor-dashboard.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="nav-logo">SkillQuest</h1>
+            <div class="nav-links">
+                <a href="home.html"><i class="fas fa-home"></i> Home</a>
+                <a href="profile.html"><i class="fas fa-user"></i> Profile</a>
+                <a href="mentor-dashboard.html" class="active"><i class="fas fa-chalkboard-teacher"></i> Mentor Dashboard</a>
+                <button id="logout-btn" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="mentor-dashboard">
+        <header class="dashboard-header">
+            <h2>Mentor Dashboard</h2>
+            <p>Create and manage learning projects, modules, and resources</p>
+        </header>
+
+        <div class="dashboard-tabs">
+            <button class="tab-btn active" data-tab="projects">My Projects</button>
+            <button class="tab-btn" data-tab="create-project">Create Project</button>
+        </div>
+
+        <!-- Projects Tab -->
+        <div class="tab-content active" id="projects-tab">
+            <div class="projects-header">
+                <h3>My Projects</h3>
+                <div class="projects-stats">
+                    <div class="stat-card">
+                        <i class="fas fa-project-diagram"></i>
+                        <span class="stat-number" id="total-projects">0</span>
+                        <span class="stat-label">Total Projects</span>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-users"></i>
+                        <span class="stat-number" id="total-enrolled">0</span>
+                        <span class="stat-label">Total Enrollments</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="projects-grid" id="projects-list">
+                <!-- Projects will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Create Project Tab -->
+        <div class="tab-content" id="create-project-tab">
+            <div class="form-container">
+                <h3>Create New Project</h3>
+                <form id="create-project-form">
+                    <div class="form-group">
+                        <label for="project-title">Project Title</label>
+                        <input type="text" id="project-title" name="title" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="project-description">Description</label>
+                        <textarea id="project-description" name="description" rows="4" required></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="project-difficulty">Difficulty Level</label>
+                        <select id="project-difficulty" name="difficulty_level" required>
+                            <option value="">Select Difficulty</option>
+                            <option value="Beginner">Beginner</option>
+                            <option value="Intermediate">Intermediate</option>
+                            <option value="Advanced">Advanced</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="project-duration">Estimated Duration (hours)</label>
+                        <input type="number" id="project-duration" name="estimated_duration" min="1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="project-xp">XP Reward</label>
+                        <input type="number" id="project-xp" name="xp_reward" min="0" required>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-plus"></i> Create Project
+                    </button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <!-- Project Detail Modal -->
+    <div class="modal" id="project-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-project-title"></h3>
+                <span class="close" id="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="modal-tabs">
+                    <button class="modal-tab-btn active" data-modal-tab="modules">Modules</button>
+                    <button class="modal-tab-btn" data-modal-tab="resources">Resources</button>
+                    <button class="modal-tab-btn" data-modal-tab="analytics">Analytics</button>
+                </div>
+
+                <!-- Modules Tab -->
+                <div class="modal-tab-content active" id="modules-modal-tab">
+                    <div class="section-header">
+                        <h4>Learning Modules</h4>
+                        <button class="btn-secondary" id="add-module-btn">
+                            <i class="fas fa-plus"></i> Add Module
+                        </button>
+                    </div>
+                    <div id="modules-list">
+                        <!-- Modules will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Resources Tab -->
+                <div class="modal-tab-content" id="resources-modal-tab">
+                    <div class="section-header">
+                        <h4>Learning Resources</h4>
+                        <button class="btn-secondary" id="add-resource-btn">
+                            <i class="fas fa-plus"></i> Add Resource
+                        </button>
+                    </div>
+                    <div id="resources-list">
+                        <!-- Resources will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Analytics Tab -->
+                <div class="modal-tab-content" id="analytics-modal-tab">
+                    <div class="analytics-grid">
+                        <div class="analytics-card">
+                            <h5>Enrollment Statistics</h5>
+                            <div class="analytics-stat">
+                                <span class="analytics-number" id="project-enrollments">0</span>
+                                <span class="analytics-label">Total Enrollments</span>
+                            </div>
+                        </div>
+                        <div class="analytics-card">
+                            <h5>Completion Rate</h5>
+                            <div class="analytics-stat">
+                                <span class="analytics-number" id="completion-rate">0%</span>
+                                <span class="analytics-label">Completion Rate</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Module Form Modal -->
+    <div class="modal" id="module-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="module-modal-title">Add Module</h3>
+                <span class="close" id="close-module-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="module-form">
+                    <input type="hidden" id="module-id" name="id">
+                    <input type="hidden" id="module-project-id" name="project_id">
+                    
+                    <div class="form-group">
+                        <label for="module-title">Module Title</label>
+                        <input type="text" id="module-title" name="title" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="module-description">Description</label>
+                        <textarea id="module-description" name="description" rows="3" required></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="module-order">Order</label>
+                        <input type="number" id="module-order" name="order_index" min="1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="module-xp">XP Reward</label>
+                        <input type="number" id="module-xp" name="xp_reward" min="0" required>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" id="cancel-module">Cancel</button>
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-save"></i> Save Module
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resource Form Modal -->
+    <div class="modal" id="resource-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="resource-modal-title">Add Resource</h3>
+                <span class="close" id="close-resource-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="resource-form">
+                    <input type="hidden" id="resource-id" name="id">
+                    <input type="hidden" id="resource-project-id" name="project_id">
+                    
+                    <div class="form-group">
+                        <label for="resource-title">Resource Title</label>
+                        <input type="text" id="resource-title" name="title" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="resource-type">Resource Type</label>
+                        <select id="resource-type" name="type" required>
+                            <option value="">Select Type</option>
+                            <option value="video">Video</option>
+                            <option value="article">Article</option>
+                            <option value="course">Course</option>
+                            <option value="quiz">Quiz</option>
+                            <option value="tool">Tool</option>
+                            <option value="book">Book</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="resource-url">URL</label>
+                        <input type="url" id="resource-url" name="url" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="resource-description">Description</label>
+                        <textarea id="resource-description" name="description" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="resource-duration">Duration (minutes)</label>
+                        <input type="number" id="resource-duration" name="duration" min="1">
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" id="cancel-resource">Cancel</button>
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-save"></i> Save Resource
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="mentor-dashboard.js"></script>
+</body>
+</html>

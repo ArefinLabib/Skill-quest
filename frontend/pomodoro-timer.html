@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pomodoro Timer - SkillQuest</title>
+    <link rel="stylesheet" href="pomodoro-timer.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="nav-logo">SkillQuest</h1>
+            <div class="nav-links">
+                <a href="home/home.html"><i class="fas fa-home"></i> Home</a>
+                <a href="Student-Profile/student_profile.html"><i class="fas fa-user"></i> Profile</a>
+                <button id="logout-btn" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="timer-container">
+        <div class="timer-header">
+            <h1>Pomodoro Timer</h1>
+            <p>Stay focused and productive with timed study sessions</p>
+        </div>
+
+        <div class="timer-card">
+            <div class="timer-display">
+                <div class="timer-time" id="timer-display">25:00</div>
+                <div class="timer-label" id="timer-label">Study Session</div>
+            </div>
+
+            <div class="timer-controls">
+                <button class="timer-btn primary" id="start-btn">
+                    <i class="fas fa-play"></i> Start
+                </button>
+                <button class="timer-btn secondary" id="pause-btn" disabled>
+                    <i class="fas fa-pause"></i> Pause
+                </button>
+                <button class="timer-btn secondary" id="reset-btn">
+                    <i class="fas fa-redo"></i> Reset
+                </button>
+            </div>
+
+            <div class="timer-modes">
+                <button class="mode-btn active" data-mode="study" data-time="25">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>Study</span>
+                    <small>25 min</small>
+                </button>
+                <button class="mode-btn" data-mode="short-break" data-time="5">
+                    <i class="fas fa-coffee"></i>
+                    <span>Short Break</span>
+                    <small>5 min</small>
+                </button>
+                <button class="mode-btn" data-mode="long-break" data-time="10">
+                    <i class="fas fa-couch"></i>
+                    <span>Long Break</span>
+                    <small>10 min</small>
+                </button>
+            </div>
+        </div>
+
+        <div class="timer-stats">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number" id="sessions-completed">0</div>
+                    <div class="stat-label">Sessions Completed</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-stopwatch"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-number" id="total-time">0h 0m</div>
+                    <div class="stat-label">Total Study Time</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="timer-tips">
+            <h3>Study Tips</h3>
+            <ul>
+                <li>Use the 25-minute study sessions for focused work</li>
+                <li>Take short breaks to rest your mind</li>
+                <li>After 4 study sessions, take a longer break</li>
+                <li>Stay hydrated and maintain good posture</li>
+            </ul>
+        </div>
+    </main>
+
+    <script>
+        class PomodoroTimer {
+            constructor() {
+                this.currentMode = 'study';
+                this.currentTime = 25 * 60; // 25 minutes in seconds
+                this.originalTime = 25 * 60;
+                this.isRunning = false;
+                this.interval = null;
+                this.sessionsCompleted = 0;
+                this.totalStudyTime = 0;
+
+                this.initializeElements();
+                this.setupEventListeners();
+                this.loadStats();
+                this.updateDisplay();
+            }
+
+            initializeElements() {
+                this.timerDisplay = document.getElementById('timer-display');
+                this.timerLabel = document.getElementById('timer-label');
+                this.startBtn = document.getElementById('start-btn');
+                this.pauseBtn = document.getElementById('pause-btn');
+                this.resetBtn = document.getElementById('reset-btn');
+                this.modeBtns = document.querySelectorAll('.mode-btn');
+                this.sessionsCompletedEl = document.getElementById('sessions-completed');
+                this.totalTimeEl = document.getElementById('total-time');
+            }
+
+            setupEventListeners() {
+                this.startBtn.addEventListener('click', () => this.start());
+                this.pauseBtn.addEventListener('click', () => this.pause());
+                this.resetBtn.addEventListener('click', () => this.reset());
+
+                this.modeBtns.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        this.switchMode(btn.dataset.mode, parseInt(btn.dataset.time));
+                    });
+                });
+
+                // Logout button
+                const logoutBtn = document.getElementById('logout-btn');
+                if (logoutBtn) {
+                    logoutBtn.addEventListener('click', () => {
+                        localStorage.removeItem('authToken');
+                        window.location.href = 'registration/registration.html';
+                    });
+                }
+            }
+
+            switchMode(mode, minutes) {
+                this.currentMode = mode;
+                this.currentTime = minutes * 60;
+                this.originalTime = minutes * 60;
+                this.isRunning = false;
+                this.clearInterval();
+
+                // Update active button
+                this.modeBtns.forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.dataset.mode === mode) {
+                        btn.classList.add('active');
+                    }
+                });
+
+                // Update label
+                const labels = {
+                    'study': 'Study Session',
+                    'short-break': 'Short Break',
+                    'long-break': 'Long Break'
+                };
+                this.timerLabel.textContent = labels[mode];
+
+                this.updateDisplay();
+                this.updateButtons();
+            }
+
+            start() {
+                if (this.isRunning) return;
+
+                this.isRunning = true;
+                this.interval = setInterval(() => {
+                    this.currentTime--;
+                    this.updateDisplay();
+
+                    if (this.currentTime <= 0) {
+                        this.completeSession();
+                    }
+                }, 1000);
+
+                this.updateButtons();
+            }
+
+            pause() {
+                this.isRunning = false;
+                this.clearInterval();
+                this.updateButtons();
+            }
+
+            reset() {
+                this.isRunning = false;
+                this.clearInterval();
+                this.currentTime = this.originalTime;
+                this.updateDisplay();
+                this.updateButtons();
+            }
+
+            completeSession() {
+                this.clearInterval();
+                this.isRunning = false;
+
+                // Play notification sound (if supported)
+                this.playNotification();
+
+                // Update stats
+                if (this.currentMode === 'study') {
+                    this.sessionsCompleted++;
+                    this.totalStudyTime += this.originalTime;
+                    this.saveStats();
+                    this.updateStats();
+                }
+
+                // Show completion message
+                this.showCompletionMessage();
+
+                // Auto-switch to break after study session
+                if (this.currentMode === 'study') {
+                    setTimeout(() => {
+                        if (this.sessionsCompleted % 4 === 0) {
+                            this.switchMode('long-break', 10);
+                        } else {
+                            this.switchMode('short-break', 5);
+                        }
+                    }, 2000);
+                } else {
+                    // Auto-switch back to study after break
+                    setTimeout(() => {
+                        this.switchMode('study', 25);
+                    }, 2000);
+                }
+
+                this.updateButtons();
+            }
+
+            clearInterval() {
+                if (this.interval) {
+                    clearInterval(this.interval);
+                    this.interval = null;
+                }
+            }
+
+            updateDisplay() {
+                const minutes = Math.floor(this.currentTime / 60);
+                const seconds = this.currentTime % 60;
+                this.timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            updateButtons() {
+                this.startBtn.disabled = this.isRunning;
+                this.pauseBtn.disabled = !this.isRunning;
+                this.resetBtn.disabled = this.isRunning && this.currentTime === this.originalTime;
+            }
+
+            playNotification() {
+                // Try to play a notification sound
+                try {
+                    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+                    audio.play();
+                } catch (e) {
+                    // Fallback: use browser notification
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification('Pomodoro Timer', {
+                            body: `${this.timerLabel.textContent} completed!`,
+                            icon: '/favicon.ico'
+                        });
+                    }
+                }
+            }
+
+            showCompletionMessage() {
+                const message = document.createElement('div');
+                message.className = 'completion-message';
+                message.innerHTML = `
+                    <div class="completion-content">
+                        <i class="fas fa-check-circle"></i>
+                        <h3>${this.timerLabel.textContent} Completed!</h3>
+                        <p>Great job! Take a moment to stretch and refresh.</p>
+                    </div>
+                `;
+                document.body.appendChild(message);
+
+                setTimeout(() => {
+                    message.remove();
+                }, 3000);
+            }
+
+            loadStats() {
+                const stats = JSON.parse(localStorage.getItem('pomodoroStats') || '{}');
+                this.sessionsCompleted = stats.sessionsCompleted || 0;
+                this.totalStudyTime = stats.totalStudyTime || 0;
+                this.updateStats();
+            }
+
+            saveStats() {
+                const stats = {
+                    sessionsCompleted: this.sessionsCompleted,
+                    totalStudyTime: this.totalStudyTime
+                };
+                localStorage.setItem('pomodoroStats', JSON.stringify(stats));
+            }
+
+            updateStats() {
+                this.sessionsCompletedEl.textContent = this.sessionsCompleted;
+                
+                const hours = Math.floor(this.totalStudyTime / 3600);
+                const minutes = Math.floor((this.totalStudyTime % 3600) / 60);
+                this.totalTimeEl.textContent = `${hours}h ${minutes}m`;
+            }
+        }
+
+        // Initialize timer when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new PomodoroTimer();
+        });
+    </script>
+</body>
+</html>
